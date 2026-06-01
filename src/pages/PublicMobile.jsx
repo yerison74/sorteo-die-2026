@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { fmt, padLote, POSICION_LABELS, POSICION_COLORS, POSICION_ICONS } from '../utils';
+import SyncStatus from '../components/SyncStatus';
+import { fmt, padLote, POSICION_LABELS, POSICION_COLORS, POSICION_ICONS, resolveLoteEnVivo } from '../utils';
 
 // ── Stat pill ────────────────────────────────────────────────────────────
 function StatPill({ icon, label, value, color }) {
   return (
     <div style={{
-      background: 'var(--surface2)', border: '1px solid var(--border)',
+      background: 'var(--surface)', border: '1px solid var(--border)',
       borderRadius: 12, padding: '14px 16px',
       display: 'flex', alignItems: 'center', gap: 12,
+      boxShadow: 'var(--shadow-sm)',
     }}>
       <div style={{ fontSize: 26 }}>{icon}</div>
       <div>
@@ -27,9 +29,10 @@ function GanadorRow({ posicion, resultado }) {
   const c = POSICION_COLORS[posicion];
   return (
     <div style={{
-      background: posicion === 1 ? 'linear-gradient(135deg,#141008,#1c1a0a)' : 'var(--surface2)',
+      background: posicion === 1 ? 'linear-gradient(135deg,#eef4fc,#ffffff)' : 'var(--surface)',
       border: `1px solid ${c}40`,
       borderRadius: 10, padding: '12px 14px',
+      boxShadow: 'var(--shadow-sm)',
       display: 'flex', alignItems: 'flex-start', gap: 12,
     }}>
       <div style={{ fontSize: 22, flexShrink: 0 }}>{POSICION_ICONS[posicion]}</div>
@@ -57,7 +60,7 @@ function GanadorRow({ posicion, resultado }) {
 }
 
 // ── Main component ───────────────────────────────────────────────────────
-export default function PublicMobile({ lotes, items, oferentes, resultados }) {
+export default function PublicMobile({ lotes, items, resultados, loteActivo, lastSyncAt, syncing }) {
   const [tab, setTab] = useState('resumen'); // 'resumen' | 'ganadores'
 
   // Stats
@@ -66,9 +69,8 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
   const pendientes    = lotes.length - sorteadosSet.size;
   const pct           = lotes.length ? Math.round((sorteadosSet.size / lotes.length) * 100) : 0;
 
-  // Current lote (last with any resultado)
   const lotesConRes   = lotes.filter(l => resultados.some(r => r.lote_id === l.id)).sort((a, b) => a.numero_lote - b.numero_lote);
-  const currentLote   = lotesConRes[lotesConRes.length - 1] || null;
+  const currentLote   = loteActivo || resolveLoteEnVivo(lotes, null, resultados);
   const currentRes    = currentLote ? resultados.filter(r => r.lote_id === currentLote.id).sort((a, b) => a.posicion - b.posicion) : [];
   const currentItems  = currentLote ? items.filter(it => it.lote_id === currentLote.id) : [];
 
@@ -80,25 +82,21 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
 
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #0e1318, #141c24)',
-        border: '1px solid rgba(201,168,76,0.2)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border2)',
         borderRadius: 16, padding: '20px 18px', marginBottom: 20,
         textAlign: 'center',
+        boxShadow: 'var(--shadow-md)',
       }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>⚖️</div>
+        <img src="/logoDie.png" alt="DIE" className="brand-logo-sm" style={{ marginBottom: 10 }} />
         <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: 'var(--gold2)' }}>
           Sorteo DIE-2026-S01
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Dirección de Infraestructura Escolar · 2026
         </div>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
-          background: 'rgba(46,204,139,0.1)', border: '1px solid rgba(46,204,139,0.3)',
-          borderRadius: 100, padding: '3px 12px',
-        }}>
-          <div style={{ width: 6, height: 6, background: 'var(--green)', borderRadius: '50%' }} className="pulse" />
-          <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>En vivo</span>
+        <div style={{ marginTop: 12 }}>
+          <SyncStatus lastSyncAt={lastSyncAt} syncing={syncing} />
         </div>
       </div>
 
@@ -116,10 +114,10 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
             key={t.id}
             onClick={() => setTab(t.id)}
             style={{
-              background: tab === t.id ? 'linear-gradient(135deg, var(--gold), #a8832a)' : 'transparent',
+              background: tab === t.id ? 'linear-gradient(135deg, var(--brand-navy), var(--brand-navy-light))' : 'transparent',
               border: 'none', borderRadius: 8, padding: '10px',
               fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 600,
-              color: tab === t.id ? '#000' : 'var(--text-dim)',
+              color: tab === t.id ? '#fff' : 'var(--text-dim)',
               cursor: 'pointer', transition: 'all 0.2s',
             }}
           >
@@ -134,10 +132,9 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
 
           {/* Stats grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <StatPill icon="📦" label="Total Lotes"    value={lotes.length}      color="var(--accent2)" />
-            <StatPill icon="✅" label="Sorteados"      value={sorteadosSet.size} color="var(--green)" />
-            <StatPill icon="⏳" label="Pendientes"     value={pendientes}        color="var(--amber)" />
-            <StatPill icon="🏢" label="Oferentes"      value={oferentes.length}  color="var(--gold)" />
+            <StatPill icon="📦" label="Total Lotes" value={lotes.length}      color="var(--accent2)" />
+            <StatPill icon="✅" label="Sorteados"   value={sorteadosSet.size} color="var(--green)" />
+            <StatPill icon="⏳" label="Pendientes"  value={pendientes}        color="var(--amber)" />
           </div>
 
           {/* Progress */}
@@ -160,7 +157,7 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
                 <div key={l.id} title={`Lote ${l.numero_lote}`} style={{
                   height: 22, borderRadius: 3,
                   background: sorteadosSet.has(l.id)
-                    ? (l.tipo === 'A' ? 'rgba(61,127,255,0.6)' : 'rgba(201,168,76,0.6)')
+                    ? (l.tipo === 'A' ? 'rgba(61,127,255,0.6)' : 'rgba(26,54,104,0.65)')
                     : 'var(--surface3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 9, fontFamily: "'DM Mono',monospace",
@@ -175,12 +172,12 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
           {/* Lote actual */}
           {currentLote ? (
             <div style={{
-              background: 'linear-gradient(135deg, #0e1318, #141a22)',
-              border: '1px solid rgba(201,168,76,0.25)',
+              background: 'var(--surface)',
+              border: '1px solid rgba(26,54,104,0.3)',
               borderRadius: 14, padding: 18,
             }}>
               <div style={{ fontSize: 11, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
-                Lote Actual
+                Lote en curso
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
                 <div style={{
@@ -229,7 +226,7 @@ export default function PublicMobile({ lotes, items, oferentes, resultados }) {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-dim)' }}>
-              <div style={{ fontSize: 40 }} className="pulse">⚖️</div>
+              <img src="/logoDie.png" alt="DIE" className="brand-logo-sm" style={{ opacity: 0.85 }} />
               <div style={{ marginTop: 12, fontSize: 13 }}>En espera de resultados…</div>
             </div>
           )}

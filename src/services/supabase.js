@@ -33,4 +33,14 @@ export const db = {
 
   deleteResultado: (id) =>
     supabase.from('resultados_sorteo').delete().eq('id', id),
+
+  getSorteoEstado: () =>
+    supabase.from('sorteo_estado').select('lote_activo_id').eq('id', 1).maybeSingle(),
+
+  setLoteActivo: (loteId) =>
+    supabase
+      .from('sorteo_estado')
+      .upsert({ id: 1, lote_activo_id: loteId ?? null, updated_at: new Date().toISOString() })
+      .select()
+      .single(),
 };

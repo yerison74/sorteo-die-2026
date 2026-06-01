@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { LoadingSpinner } from './UI';
+import SyncStatus from './SyncStatus';
 
 const NAV = [
   { path: '/',           label: 'Dashboard',       icon: '📊' },
@@ -8,11 +9,11 @@ const NAV = [
   { path: '/ganadores',  label: 'Ganadores',        icon: '🏆' },
 ];
 
-export default function Topbar({ onRefresh, loading }) {
+export default function Topbar({ onRefresh, loading, lastSyncAt }) {
   return (
     <header className="topbar">
       <div className="topbar-logo">
-        <div className="topbar-emblem">⚖️</div>
+        <img src="/logoDie.png" alt="Educación - Infraestructura Escolar" className="topbar-logo-img" />
         <div>
           <div className="topbar-title">Sistema de Sorteo</div>
           <div className="topbar-sub">DIE — Infraestructura Escolar · 2026</div>
@@ -33,6 +34,7 @@ export default function Topbar({ onRefresh, loading }) {
       </nav>
 
       <div className="topbar-actions">
+        {lastSyncAt && <SyncStatus lastSyncAt={lastSyncAt} syncing={loading} compact />}
         {loading && <LoadingSpinner size={18} />}
         <button className="btn btn-secondary btn-sm" onClick={onRefresh} title="Actualizar datos">
           ⟳ Actualizar

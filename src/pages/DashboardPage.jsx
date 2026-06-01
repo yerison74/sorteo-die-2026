@@ -1,36 +1,105 @@
 import { SectionHeader } from '../components/UI';
 import { fmt, padLote } from '../utils';
 
-export default function DashboardPage({ lotes, items, oferentes, resultados }) {
-  const ganadores1 = resultados.filter(r => r.posicion === 1);
-  const sorteadosSet = new Set(ganadores1.map(r => r.lote_id));
+function LoteTipoPanel({ tipo, lotes, sorteadosSet }) {
+  const typed = lotes
+    .filter((l) => (l.tipo || '').toUpperCase() === tipo)
+    .sort((a, b) => a.numero_lote - b.numero_lote);
+  const doneCount = typed.filter((l) => sorteadosSet.has(l.id)).length;
+  const pct = typed.length ? Math.round((doneCount / typed.length) * 100) : 0;
+  const doneBg = tipo === 'A' ? 'rgba(61,127,255,0.55)' : 'rgba(26,54,104,0.65)';
+  const cols = typed.length <= 12 ? 4 : 5;
+
+  return (
+    <div className="card" style={{ height: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div className="card-title">Lotes Tipo {tipo}</div>
+            <span className={`badge badge-${tipo.toLowerCase()}`}>{tipo}</span>
+          </div>
+          <div className="card-sub">
+            {doneCount} de {typed.length} sorteados
+          </div>
+        </div>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 28, fontWeight: 500, color: 'var(--gold2)' }}>
+          {pct}%
+        </div>
+      </div>
+
+      <div style={{ height: 6, background: 'var(--surface3)', borderRadius: 6, overflow: 'hidden', marginBottom: 14 }}>
+        <div
+          style={{
+            height: '100%',
+            width: `${pct}%`,
+            background: tipo === 'A'
+              ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
+              : 'linear-gradient(90deg, var(--brand-navy), var(--brand-navy-light))',
+            borderRadius: 6,
+            transition: 'width 1s ease',
+          }}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 4 }}>
+        {typed.map((l) => {
+          const done = sorteadosSet.has(l.id);
+          return (
+            <div
+              key={l.id}
+              title={`Lote ${padLote(l.numero_lote)} — Tipo ${l.tipo}`}
+              style={{
+                height: 32,
+                borderRadius: 4,
+                background: done ? doneBg : 'var(--surface3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontFamily: "'DM Mono',monospace",
+                color: done ? '#fff' : 'var(--text-dim)',
+                transition: 'background 0.4s',
+              }}
+            >
+              {l.numero_lote}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 11, color: 'var(--text-dim)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, background: doneBg, borderRadius: 2, display: 'inline-block' }} />
+          Sorteado
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 10, height: 10, background: 'var(--surface3)', borderRadius: 2, display: 'inline-block' }} />
+          Pendiente
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardPage({ lotes, items, resultados }) {
+  const ganadores1 = resultados.filter((r) => r.posicion === 1);
+  const sorteadosSet = new Set(ganadores1.map((r) => r.lote_id));
   const pendientes = lotes.length - sorteadosSet.size;
   const pct = lotes.length ? Math.round((sorteadosSet.size / lotes.length) * 100) : 0;
 
-  // Inversión por provincia
-  const porProv = {};
-  items.forEach(it => {
-    const p = it.provincia || 'Sin provincia';
-    porProv[p] = (porProv[p] || 0) + Number(it.monto_obra);
-  });
-  const provArr = Object.entries(porProv).sort((a, b) => b[1] - a[1]);
-  const maxProv = provArr[0]?.[1] || 1;
-
   const stats = [
-    { label: 'Total Lotes',              value: lotes.length,       icon: '📦', color: 'var(--accent2)' },
-    { label: 'Total Oferentes',          value: oferentes.length,   icon: '🏢', color: 'var(--gold)' },
-    { label: 'Lotes Sorteados',          value: sorteadosSet.size,  icon: '✅', color: 'var(--green)' },
-    { label: 'Lotes Pendientes',         value: pendientes,         icon: '⏳', color: 'var(--amber)' },
+    { label: 'Total Lotes', value: lotes.length, icon: '📦', color: 'var(--accent2)' },
+    { label: 'Lotes Sorteados', value: sorteadosSet.size, icon: '✅', color: 'var(--green)' },
+    { label: 'Lotes Pendientes', value: pendientes, icon: '⏳', color: 'var(--amber)' },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <SectionHeader title="Dashboard" sub="Resumen del Sorteo DIE-2026-S01" />
 
-      {/* Stats */}
-      <div className="grid-4">
+      <div className="grid-3">
         {stats.map((s, i) => (
-          <div key={i} className="stat-card" style={{ borderColor: s.color + '35' }}>
+          <div key={i} className="stat-card">
             <div className="stat-icon">{s.icon}</div>
             <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
             <div className="stat-label">{s.label}</div>
@@ -38,91 +107,36 @@ export default function DashboardPage({ lotes, items, oferentes, resultados }) {
         ))}
       </div>
 
-      <div className="grid-2">
-        {/* Progress */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Progreso del Sorteo</div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>
-                {sorteadosSet.size} de {lotes.length} lotes completados
-              </div>
-            </div>
-            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 36, fontWeight: 500, color: 'var(--gold2)' }}>
-              {pct}%
-            </div>
-          </div>
-          <div style={{ height: 8, background: 'var(--surface3)', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
-            <div style={{
-              height: '100%', width: `${pct}%`,
-              background: 'linear-gradient(90deg, var(--gold), var(--gold2))',
-              borderRadius: 8, transition: 'width 1s ease',
-            }} />
-          </div>
-          {/* Lote grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
-            {lotes.map(l => {
-              const done = sorteadosSet.has(l.id);
-              return (
-                <div
-                  key={l.id}
-                  title={`Lote ${l.numero_lote} — Tipo ${l.tipo}`}
-                  style={{
-                    height: 30, borderRadius: 4,
-                    background: done
-                      ? (l.tipo === 'A' ? 'rgba(61,127,255,0.55)' : 'rgba(201,168,76,0.55)')
-                      : 'var(--surface3)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontFamily: "'DM Mono',monospace",
-                    color: done ? '#fff' : 'var(--text-dim)',
-                    transition: 'background 0.4s',
-                    cursor: 'default',
-                  }}
-                >
-                  {l.numero_lote}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 11, color: 'var(--text-dim)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 10, background: 'rgba(61,127,255,0.55)', borderRadius: 2, display: 'inline-block' }} /> Tipo A
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 10, background: 'rgba(201,168,76,0.55)', borderRadius: 2, display: 'inline-block' }} /> Tipo B
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 10, background: 'var(--surface3)', borderRadius: 2, display: 'inline-block' }} /> Pendiente
-            </span>
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div className="card-title">Progreso general del sorteo</div>
+          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 24, fontWeight: 500, color: 'var(--gold2)' }}>
+            {pct}%
           </div>
         </div>
-
-        {/* Inversión por provincia */}
-        <div className="card">
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18 }}>Inversión por Provincia</div>
-          <div className="chart-bar-wrap">
-            {provArr.map(([prov, monto]) => (
-              <div key={prov} className="chart-bar-row">
-                <div className="chart-bar-label">{prov}</div>
-                <div className="chart-bar-track">
-                  <div
-                    className="chart-bar-fill"
-                    style={{
-                      width: `${(monto / maxProv) * 100}%`,
-                      background: 'linear-gradient(90deg, var(--gold), var(--gold2))',
-                    }}
-                  />
-                </div>
-                <div className="chart-bar-val">{fmt(monto)}</div>
-              </div>
-            ))}
-          </div>
+        <div className="card-sub" style={{ marginBottom: 12 }}>
+          {sorteadosSet.size} de {lotes.length} lotes con ganador principal
+        </div>
+        <div style={{ height: 8, background: 'var(--surface3)', borderRadius: 8, overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%',
+              width: `${pct}%`,
+              background: 'linear-gradient(90deg, var(--brand-navy), var(--brand-navy-light))',
+              borderRadius: 8,
+              transition: 'width 1s ease',
+            }}
+          />
         </div>
       </div>
 
-      {/* Lotes table */}
+      <div className="grid-2">
+        <LoteTipoPanel tipo="A" lotes={lotes} sorteadosSet={sorteadosSet} />
+        <LoteTipoPanel tipo="B" lotes={lotes} sorteadosSet={sorteadosSet} />
+      </div>
+
       <div className="card">
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Tabla de Lotes</div>
+        <div className="card-title" style={{ marginBottom: 16 }}>Tabla de Lotes</div>
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
@@ -136,10 +150,10 @@ export default function DashboardPage({ lotes, items, oferentes, resultados }) {
               </tr>
             </thead>
             <tbody>
-              {lotes.map(l => {
+              {lotes.map((l) => {
                 const done = sorteadosSet.has(l.id);
-                const g1 = resultados.find(r => r.lote_id === l.id && r.posicion === 1);
-                const loteItems = items.filter(it => it.lote_id === l.id);
+                const g1 = resultados.find((r) => r.lote_id === l.id && r.posicion === 1);
+                const loteItems = items.filter((it) => it.lote_id === l.id);
                 return (
                   <tr key={l.id}>
                     <td className="mono" style={{ fontWeight: 600 }}>#{padLote(l.numero_lote)}</td>
@@ -154,10 +168,11 @@ export default function DashboardPage({ lotes, items, oferentes, resultados }) {
                       )}
                     </td>
                     <td>
-                      {done
-                        ? <span className="badge badge-green">✓ Sorteado</span>
-                        : <span className="badge badge-pending">Pendiente</span>
-                      }
+                      {done ? (
+                        <span className="badge badge-green">✓ Sorteado</span>
+                      ) : (
+                        <span className="badge badge-pending">Pendiente</span>
+                      )}
                     </td>
                   </tr>
                 );

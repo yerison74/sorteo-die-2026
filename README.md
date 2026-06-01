@@ -19,9 +19,19 @@ Edite `.env`:
 ```
 REACT_APP_SUPABASE_URL=https://TU_PROYECTO.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=TU_ANON_KEY
+REACT_APP_PUBLIC_URL=https://sorteo-die-2026.vercel.app
 ```
 
 > Las credenciales las encuentra en su proyecto de Supabase → **Settings → API**
+
+### QR en Pantalla Pública
+
+El código QR abre la ruta `/info` en el celular. **No use `localhost` en el QR**: los teléfonos no pueden acceder a su PC.
+
+- **Producción (Vercel):** `REACT_APP_PUBLIC_URL=https://sorteo-die-2026.vercel.app`
+- **Prueba en la misma red Wi‑Fi:** `REACT_APP_PUBLIC_URL=http://192.168.x.x:3000` (IP de su PC) y ejecute `set HOST=0.0.0.0` antes de `npm start` en Windows, o `HOST=0.0.0.0 npm start` en Mac/Linux.
+
+Tras cambiar `.env`, reinicie `npm start`.
 
 ### 3. Iniciar en desarrollo
 ```bash
@@ -42,6 +52,7 @@ Asegúrese de haber ejecutado los siguientes scripts SQL en su proyecto de Supab
 1. `supabase_sorteo_sql.txt` — tablas `lotes` e `items_lote`
 2. `oferentes_supabase.sql` — tabla `oferentes_sorteo` con todos los oferentes
 3. `resultados_sorteo_supabase.txt` — tabla `resultados_sorteo`
+4. **`docs/sql/`** — validar y corregir códigos `DIE-2026-S01-{A|B}-{000}` ([guía](./docs/sql/README.md))
 
 ### Row Level Security (RLS)
 Para que la aplicación pueda leer y escribir, puede:
@@ -77,12 +88,31 @@ CREATE POLICY "allow_all" ON public.resultados_sorteo FOR ALL USING (true) WITH 
 
 ## ⚙️ Lógica del sorteo
 
-- El operador selecciona un **lote** y una **posición** (Ganador Principal, Suplente 1, Suplente 2).
-- Ingresa el número extraído de la tómbola (ej: `001`).
-- El sistema genera automáticamente el código: `DIE-2026-S01-A-001` o `DIE-2026-S01-B-001`.
-- Si el oferente ya fue **Ganador Principal** en otro lote, el registro es bloqueado.
-- Los **Suplentes** pueden continuar participando en otros lotes.
-- La pantalla pública se actualiza automáticamente via **Supabase Realtime**.
+### Códigos de oferentes (tómbola)
+
+Formato: `DIE-2026-S01-{A|B}-{000}`
+
+- `{A|B}` = tipo de tombola (no el número de lote de obra).
+- `{000}` = número de registro del oferente en esa tombola (orden creciente).
+- Un mismo oferente inscrito en A y en B tiene **dos códigos** (ej. `…-A-005` y `…-B-016`), normalmente **dos filas** en `oferentes_sorteo`.
+
+### Reglas de adjudicación
+
+| Situación | ¿Puede volver a salir? |
+|-----------|-------------------------|
+| Ya fue **Ganador Principal** (cualquier lote) | **No**, en ninguna posición |
+| Solo fue **Suplente** (1 o 2) | **Sí**, en cualquier posición y lote |
+
+Mensaje al bloquear: *El oferente {nombre} ya gano en el lote {NN} de la tombola {A|B}.*
+
+### Flujo operador
+
+- Selecciona un **lote** y una **posición** (Ganador Principal, Suplente 1, Suplente 2).
+- Ingresa el **número de tómbola** (ej. `5` → código `DIE-2026-S01-A-005` si el lote es tipo A).
+- Al **Registrar** en Panel Operador, los datos se propagan a:
+  - Dashboard, Ganadores, Pantalla Pública (misma PC u otra pestaña)
+  - Celulares en **`/info`** (QR) vía Supabase Realtime + respaldo cada 8 s
+- En Supabase ejecute `docs/sql/04_habilitar_realtime.sql` o active **Replication** en `resultados_sorteo`.
 
 ---
 

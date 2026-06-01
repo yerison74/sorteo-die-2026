@@ -6,7 +6,7 @@ function PosCard({ posicion, resultado }) {
   const c = POSICION_COLORS[posicion];
   return (
     <div style={{
-      background: posicion === 1 ? 'linear-gradient(135deg, var(--surface2), rgba(255,215,0,0.04))' : 'var(--surface2)',
+      background: posicion === 1 ? 'linear-gradient(135deg, var(--surface2), rgba(26,54,104,0.08))' : 'var(--surface2)',
       border: `1px solid ${c}40`,
       borderRadius: 'var(--radius)', padding: 16,
       display: 'flex', flexDirection: 'column', gap: 8,
@@ -68,7 +68,7 @@ export default function GanadoresPage({ lotes, items, resultados }) {
             <div key={l.id} style={{
               background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 'var(--radius)', overflow: 'hidden',
-              transition: 'border-color 0.2s',
+              boxShadow: 'var(--shadow-card)',
             }}>
               {/* Row header */}
               <div

@@ -10,7 +10,11 @@ import GanadoresPage from './pages/GanadoresPage';
 import { LoadingSpinner } from './components/UI';
 
 export default function App() {
-  const { lotes, items, oferentes, resultados, loading, error, refresh } = useAppData();
+  const {
+    lotes, items, oferentes, resultados,
+    loteActivo, setLoteActivo,
+    loading, syncing, lastSyncAt, error, refresh,
+  } = useAppData();
 
   const isConfigured =
     process.env.REACT_APP_SUPABASE_URL &&
@@ -33,8 +37,8 @@ export default function App() {
             lineHeight: 1.9, border: '1px solid var(--border2)',
           }}>
             <div style={{ color: 'var(--text-dim)' }}># .env</div>
-            <div><span style={{ color: 'var(--accent2)' }}>REACT_APP_SUPABASE_URL</span>=https://xxxx.supabase.co</div>
-            <div><span style={{ color: 'var(--accent2)' }}>REACT_APP_SUPABASE_ANON_KEY</span>=eyJhb...</div>
+            <div><span style={{ color: 'var(--brand-navy)' }}>REACT_APP_SUPABASE_URL</span>=https://xxxx.supabase.co</div>
+            <div><span style={{ color: 'var(--brand-navy)' }}>REACT_APP_SUPABASE_ANON_KEY</span>=eyJhb...</div>
           </div>
         </div>
       </div>
@@ -43,12 +47,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <Topbar onRefresh={refresh} loading={loading} />
+      <Topbar onRefresh={() => refresh()} loading={loading || syncing} lastSyncAt={lastSyncAt} />
 
       {error && (
         <div style={{
-          padding: '10px 24px', background: 'rgba(224,80,80,0.08)',
-          borderBottom: '1px solid rgba(224,80,80,0.2)',
+          padding: '10px 24px', background: '#fef2f2',
+          borderBottom: '1px solid #fecaca',
           display: 'flex', alignItems: 'flex-start', gap: 10,
         }}>
           <span style={{ fontSize: 16 }}>⚠️</span>
@@ -72,26 +76,48 @@ export default function App() {
           {/* Dashboard */}
           <Route path="/" element={
             <main className="main">
-              <DashboardPage lotes={lotes} items={items} oferentes={oferentes} resultados={resultados} />
+              <DashboardPage lotes={lotes} items={items} resultados={resultados} />
             </main>
           } />
 
           {/* Panel operador */}
           <Route path="/operador" element={
             <main className="main">
-              <OperatorPanel lotes={lotes} items={items} oferentes={oferentes} resultados={resultados} onRefresh={refresh} />
+              <OperatorPanel
+                lotes={lotes}
+                items={items}
+                oferentes={oferentes}
+                resultados={resultados}
+                loteActivo={loteActivo}
+                onRefresh={refresh}
+                onLoteActivoChange={setLoteActivo}
+              />
             </main>
           } />
 
           {/* Pantalla pública proyectable (con QR) */}
           <Route path="/publico" element={
-            <PublicScreen lotes={lotes} items={items} resultados={resultados} />
+            <PublicScreen
+              lotes={lotes}
+              items={items}
+              resultados={resultados}
+              loteActivo={loteActivo}
+              lastSyncAt={lastSyncAt}
+              syncing={syncing}
+            />
           } />
 
           {/* Página móvil que se abre con el QR */}
           <Route path="/info" element={
             <main className="main">
-              <PublicMobile lotes={lotes} items={items} oferentes={oferentes} resultados={resultados} />
+              <PublicMobile
+                lotes={lotes}
+                items={items}
+                resultados={resultados}
+                loteActivo={loteActivo}
+                lastSyncAt={lastSyncAt}
+                syncing={syncing}
+              />
             </main>
           } />
 

@@ -29,7 +29,7 @@ export function Alert({ type = 'info', children }) {
 
 export function SectionHeader({ title, sub }) {
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div className="section-header">
       <div className="section-title">{title}</div>
       {sub && <div className="section-sub">{sub}</div>}
     </div>
@@ -46,7 +46,7 @@ export function EmptyState({ icon = '📋', text = 'Sin datos' }) {
 }
 
 export function GanadorCard({ posicion, resultado, onDelete }) {
-  const colors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
+  const colors = { 1: '#1a3668', 2: '#64748b', 3: '#b45309' };
   const icons  = { 1: '👑', 2: '🥈', 3: '🥉' };
   const labels = { 1: 'Ganador Principal', 2: 'Suplente 1', 3: 'Suplente 2' };
   const c = colors[posicion];
@@ -56,7 +56,7 @@ export function GanadorCard({ posicion, resultado, onDelete }) {
       className="ganador-card"
       style={{
         background: posicion === 1
-          ? 'linear-gradient(135deg, var(--surface2), rgba(255,215,0,0.04))'
+          ? 'linear-gradient(135deg, var(--surface2), rgba(26,54,104,0.08))'
           : 'var(--surface2)',
         border: `1px solid ${c}40`,
         borderRadius: 'var(--radius)',

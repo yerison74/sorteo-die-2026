@@ -1,15 +1,20 @@
 import { QRCodeSVG } from 'qrcode.react';
-import { fmt, padLote, POSICION_LABELS, POSICION_COLORS, POSICION_ICONS } from '../utils';
+import SyncStatus from '../components/SyncStatus';
+import {
+  fmt, padLote, POSICION_LABELS, POSICION_COLORS, POSICION_ICONS,
+  getQrInfoUrl, isLocalQrUrl, resolveLoteEnVivo,
+} from '../utils';
 
 function GanadorPublicCard({ posicion, resultado }) {
   const c = POSICION_COLORS[posicion];
   return (
     <div style={{
       background: posicion === 1
-        ? 'linear-gradient(135deg, #141008, #1c1a0a)'
+        ? 'linear-gradient(135deg, #eef4fc, #ffffff)'
         : 'var(--surface)',
       border: `1px solid ${c}45`,
       borderRadius: 14, padding: 22, position: 'relative', overflow: 'hidden',
+      boxShadow: 'var(--shadow-md)',
     }}>
       <div style={{ position: 'absolute', top: 14, right: 16, fontSize: 26, opacity: 0.35 }}>
         {POSICION_ICONS[posicion]}
@@ -39,32 +44,28 @@ function GanadorPublicCard({ posicion, resultado }) {
   );
 }
 
-export default function PublicScreen({ lotes, items, resultados }) {
+export default function PublicScreen({ lotes, items, resultados, loteActivo, lastSyncAt, syncing }) {
   const lotesConResultado = lotes
     .filter(l => resultados.some(r => r.lote_id === l.id))
     .sort((a, b) => a.numero_lote - b.numero_lote);
 
-  const currentLote = lotesConResultado[lotesConResultado.length - 1] || null;
+  const currentLote = loteActivo || resolveLoteEnVivo(lotes, null, resultados);
   const historial   = [...lotesConResultado].reverse().slice(0, 12);
 
   const getLoteRes   = (l) => resultados.filter(r => r.lote_id === l.id).sort((a, b) => a.posicion - b.posicion);
   const getLoteItems = (l) => items.filter(it => it.lote_id === l.id);
 
-  // URL that the QR will point to — the /info mobile page
-  const qrUrl = `${window.location.origin}/info`;
+  const qrUrl = getQrInfoUrl();
+  const qrLocalOnly = isLocalQrUrl(qrUrl);
 
   if (!currentLote) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 64px)', flexDirection: 'column', gap: 18 }}>
-        <div style={{ fontSize: 72 }} className="pulse">⚖️</div>
-        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 32, color: 'var(--gold2)', textAlign: 'center' }}>
-          Sorteo DIE-2026-S01
-        </div>
-        <div style={{ color: 'var(--text-dim)', fontSize: 13, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-          En espera de resultados…
-        </div>
-        {/* QR shown even on waiting screen */}
-        <QRCard qrUrl={qrUrl} />
+      <div className="public-waiting">
+        <img src="/logoDie.png" alt="DIE" className="brand-logo-xl" />
+        <div className="public-waiting-title">Sorteo DIE-2026-S01</div>
+        <div className="public-waiting-sub">En espera de resultados…</div>
+        <SyncStatus lastSyncAt={lastSyncAt} syncing={syncing} />
+        <QRCard qrUrl={qrUrl} large localOnly={qrLocalOnly} />
       </div>
     );
   }
@@ -77,25 +78,29 @@ export default function PublicScreen({ lotes, items, resultados }) {
       display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20,
       padding: 24, maxWidth: 1400, margin: '0 auto',
     }}>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+        <SyncStatus lastSyncAt={lastSyncAt} syncing={syncing} />
+      </div>
       {/* ── MAIN ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Lote header */}
         <div style={{
-          background: 'linear-gradient(135deg, #0e1318 0%, #141a22 100%)',
-          border: '1px solid rgba(201,168,76,0.22)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border2)',
           borderRadius: 18, padding: 28, position: 'relative', overflow: 'hidden',
+          boxShadow: 'var(--shadow-lg)',
         }}>
           <div style={{
             position: 'absolute', top: -80, right: -80,
             width: 240, height: 240, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(26,54,104,0.12) 0%, transparent 70%)',
             pointerEvents: 'none',
           }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 11, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>
-                Lote Actual
+                Lote en curso · Seleccionado en operador
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
                 <div style={{
@@ -159,7 +164,7 @@ export default function PublicScreen({ lotes, items, resultados }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* QR Card */}
-        <QRCard qrUrl={qrUrl} />
+        <QRCard qrUrl={qrUrl} localOnly={qrLocalOnly} />
 
         {/* History */}
         <div className="card" style={{ position: 'sticky', top: 88 }}>
@@ -197,52 +202,92 @@ export default function PublicScreen({ lotes, items, resultados }) {
 }
 
 // ── QR Card component ────────────────────────────────────────────────────
-function QRCard({ qrUrl }) {
+function QRCard({ qrUrl, large = false, localOnly = false }) {
+  const qrSize = large ? 280 : 180;
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #0e1318, #141c24)',
-      border: '1px solid rgba(201,168,76,0.3)',
-      borderRadius: 14, padding: 20,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: large ? 20 : 14,
+      padding: large ? '36px 40px' : 22,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: large ? 22 : 14,
+      boxShadow: 'var(--shadow-lg)',
+      width: large ? 'min(100%, 480px)' : '100%',
     }}>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--gold)' }}>
+      <div style={{
+        fontSize: large ? 15 : 11,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.15em',
+        color: 'var(--brand-navy)',
+      }}>
         📱 Seguimiento en vivo
       </div>
 
-      {/* QR with gold border frame */}
       <div style={{
-        padding: 10,
+        padding: large ? 16 : 10,
         background: '#fff',
-        borderRadius: 10,
-        boxShadow: '0 0 0 2px var(--gold), 0 0 24px rgba(201,168,76,0.2)',
+        borderRadius: large ? 14 : 10,
+        boxShadow: '0 0 0 2px var(--brand-navy-light), 0 8px 28px rgba(26,54,104,0.2)',
       }}>
         <QRCodeSVG
           value={qrUrl}
-          size={160}
+          size={qrSize}
           bgColor="#ffffff"
-          fgColor="#07080d"
-          level="M"
-          includeMargin={false}
+          fgColor="#1a3668"
+          level="H"
+          includeMargin
         />
       </div>
 
+      {localOnly && (
+        <div className="alert alert-warn" style={{ width: '100%', fontSize: large ? 13 : 12, lineHeight: 1.5 }}>
+          El QR apunta a <strong>localhost</strong>: el celular no puede abrirlo. En <code>.env</code> agregue{' '}
+          <code>REACT_APP_PUBLIC_URL=https://su-dominio.vercel.app</code> y reinicie <code>npm start</code>.
+        </div>
+      )}
+
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+        <div style={{
+          fontSize: large ? 20 : 14,
+          fontWeight: 600,
+          color: 'var(--text)',
+          marginBottom: large ? 8 : 4,
+        }}>
           Escanea para ver resultados
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+        <div style={{
+          fontSize: large ? 15 : 12,
+          color: 'var(--text-dim)',
+          lineHeight: 1.6,
+        }}>
           Dashboard · Ganadores<br />Actualización en tiempo real
         </div>
       </div>
 
-      <div style={{
-        fontFamily: "'DM Mono',monospace", fontSize: 10,
-        color: 'var(--text-dim)', wordBreak: 'break-all', textAlign: 'center',
-        background: 'var(--surface3)', padding: '4px 8px', borderRadius: 4,
-        width: '100%',
-      }}>
+      <a
+        href={qrUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          fontFamily: "'DM Mono',monospace",
+          fontSize: large ? 12 : 10,
+          color: 'var(--brand-navy)',
+          wordBreak: 'break-all',
+          textAlign: 'center',
+          background: 'var(--surface3)',
+          padding: large ? '10px 14px' : '6px 10px',
+          borderRadius: 8,
+          width: '100%',
+          textDecoration: 'none',
+          display: 'block',
+        }}
+      >
         {qrUrl}
-      </div>
+      </a>
     </div>
   );
 }
