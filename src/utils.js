@@ -42,14 +42,18 @@ export function padLote(n) {
 
 /** Lote que muestra pantalla pública / QR: el elegido en Panel Operador */
 export function resolveLoteEnVivo(lotes, loteActivoId, resultados) {
+  // If operator explicitly selected a lote, always show that one
   if (loteActivoId != null && lotes?.length) {
     const picked = lotes.find((l) => l.id == loteActivoId);
     if (picked) return picked;
   }
-  const conRes = (lotes || [])
-    .filter((l) => (resultados || []).some((r) => r.lote_id === l.id))
+  // loteActivoId is null — operator has not selected any lote
+  // Fallback: show the LAST lote that has a Ganador Principal (posicion=1)
+  // This prevents showing a lote that only has suplentes or was partially filled
+  const conGanador = (lotes || [])
+    .filter((l) => (resultados || []).some((r) => r.lote_id === l.id && r.posicion === 1))
     .sort((a, b) => a.numero_lote - b.numero_lote);
-  return conRes[conRes.length - 1] || null;
+  return conGanador[conGanador.length - 1] || null;
 }
 
 /** URL absoluta de la página móvil (/info) codificada en el QR */

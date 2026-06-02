@@ -77,11 +77,28 @@ export function useAppData() {
 
   const setLoteActivo = useCallback(async (lote) => {
     const id = lote?.id ?? null;
+
+    // 1. Update local state immediately (optimistic)
     applyLoteActivoId(id);
     broadcastLoteActivo(id);
-    const { error } = await db.setLoteActivo(id);
-    if (error) console.warn('[sorteo] sorteo_estado:', error.message);
-  }, [applyLoteActivoId]);
+
+    // 2. Persist to Supabase — retry once on failure
+    const tryWrite = async () => {
+      const { error } = await db.setLoteActivo(id);
+      if (error) {
+        console.warn('[sorteo] sorteo_estado write failed, retrying:', error.message);
+        await new Promise(r => setTimeout(r, 800));
+        const { error: error2 } = await db.setLoteActivo(id);
+        if (error2) console.error('[sorteo] sorteo_estado write failed after retry:', error2.message);
+      }
+    };
+    tryWrite();
+
+    // 3. Re-fetch after short delay to confirm Supabase has the new value
+    setTimeout(() => {
+      if (mountedRef.current) fetchSorteoEstado();
+    }, 1200);
+  }, [applyLoteActivoId, fetchSorteoEstado]);
 
   const fetchResultados = useCallback(async () => {
     const { data, error } = await db.getResultados();
@@ -229,6 +246,17 @@ export function useAppData() {
     const id = setInterval(tick, POLL_MS);
     return () => clearInterval(id);
   }, [fetchResultados, fetchSorteoEstado]);
+
+  // Faster poll for sorteo_estado only (lote activo changes must feel instant)
+  // Runs every 2s independently of the main POLL_MS
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible' && mountedRef.current) {
+        fetchSorteoEstado();
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, [fetchSorteoEstado]);
 
   const errorMsg = Object.entries(errors)
     .map(([t, m]) => `[${t}]: ${m}`)
