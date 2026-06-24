@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { db } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { generateCode, fmt, padLote, POSICION_LABELS, POSICION_COLORS, POSICION_ICONS } from '../utils';
@@ -24,11 +24,16 @@ export default function OperatorPanel({
   const [saving, setSaving] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState('all'); // 'all' | 'A' | 'B'
 
+  // Solo al cargar el panel por primera vez: si hay un lote publicado,
+  // abrimos el panel posicionado ahí. Después de eso, la selección es
+  // 100% manual y nunca se vuelve a forzar desde loteActivo.
+  const didInitRef = useRef(false);
   useEffect(() => {
+    if (didInitRef.current) return;
     if (!loteActivo || !lotes.length) return;
-    if (selectedLote?.id === loteActivo.id) return;
+    didInitRef.current = true;
     setSelectedLote(loteActivo);
-  }, [loteActivo, lotes, selectedLote?.id]);
+  }, [loteActivo, lotes]);
 
   const lotesFiltrados = lotes.filter(l => {
     if (filtroTipo === 'all') return true;
@@ -137,7 +142,12 @@ export default function OperatorPanel({
     setNumero('');
     setOferente(null);
     setAlert(null);
-    onLoteActivoChange?.(l);
+    // Nota: seleccionar un lote para trabajar en él ya NO lo publica
+    // automáticamente. Usa el botón "Publicar en Pantalla" para eso.
+  };
+
+  const publicarLoteActual = () => {
+    if (selectedLote) onLoteActivoChange?.(selectedLote);
   };
 
   const cambiarFiltro = (tipo) => {
@@ -277,8 +287,31 @@ export default function OperatorPanel({
             <>
               {/* Results for current lote */}
               <div className="card">
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
-                  Resultados — Lote {padLote(selectedLote.numero_lote)}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    Resultados — Lote {padLote(selectedLote.numero_lote)}
+                  </div>
+                  {loteActivo?.id === selectedLote.id ? (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      background: 'rgba(34,197,94,0.12)', color: '#16a34a',
+                      border: '1px solid rgba(34,197,94,0.3)',
+                    }}>
+                      📺 Publicado en pantalla
+                    </span>
+                  ) : (
+                    <button
+                      onClick={publicarLoteActual}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                        background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer',
+                      }}
+                    >
+                      📺 Publicar en Pantalla
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                   {[1, 2, 3].map(pos => (

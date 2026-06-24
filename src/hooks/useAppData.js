@@ -49,6 +49,12 @@ export function useAppData(sorteoId) {
   const [errors,      setErrors]      = useState({});
   const mountedRef = useRef(true);
 
+  // Guard contra condición de carrera: cuando el operador cambia de lote,
+  // ignoramos lecturas de Supabase/polling que aún no reflejen ese cambio
+  // (pueden llegar con el valor viejo si el UPDATE no terminó a tiempo).
+  const pendingLoteRef     = useRef(null); // { id, since } del último cambio local intencional
+  const PENDING_GRACE_MS   = 4000;
+
   const applyLoteActivoId = useCallback((id) => {
     setLoteActivoId(id ?? null);
     try {
@@ -59,11 +65,31 @@ export function useAppData(sorteoId) {
   }, []);
 
   const fetchSorteoEstado = useCallback(async () => {
-    const { data, error } = await db.getSorteoEstado();
+    if (!sorteoId) return;
+    const { data, error } = await db.getSorteoEstado(sorteoId);
     if (!mountedRef.current) return;
     if (!error) {
+      const remoteId = data?.lote_actual_id ?? null;
+      const pending = pendingLoteRef.current;
+
+      if (pending) {
+        const withinGrace = Date.now() - pending.since < PENDING_GRACE_MS;
+        if (remoteId === pending.id) {
+          // Supabase ya confirmó el cambio local — soltamos el guard
+          pendingLoteRef.current = null;
+        } else if (withinGrace) {
+          // Lectura todavía no refleja el cambio reciente del operador: la ignoramos
+          if (mountedRef.current) setEstadoLoaded(true);
+          return;
+        } else {
+          // Pasó el período de gracia y Supabase sigue sin coincidir:
+          // soltamos el guard y confiamos en el servidor para no quedar atascados.
+          pendingLoteRef.current = null;
+        }
+      }
+
       // Always trust Supabase — if null, clear the lote activo
-      applyLoteActivoId(data?.lote_activo_id ?? null);
+      applyLoteActivoId(remoteId);
       if (mountedRef.current) setEstadoLoaded(true);
       return;
     }
@@ -73,10 +99,14 @@ export function useAppData(sorteoId) {
       if (stored) applyLoteActivoId(Number(stored));
     } catch { /* ignore */ }
     if (mountedRef.current) setEstadoLoaded(true);
-  }, [applyLoteActivoId]);
+  }, [applyLoteActivoId, sorteoId]);
 
   const setLoteActivo = useCallback(async (lote) => {
     const id = lote?.id ?? null;
+
+    // Marca esta intención local como "pendiente de confirmar" para que
+    // ninguna lectura vieja de polling/realtime la pise antes de tiempo.
+    pendingLoteRef.current = { id, since: Date.now() };
 
     // 1. Update local state immediately (optimistic)
     applyLoteActivoId(id);
@@ -84,11 +114,11 @@ export function useAppData(sorteoId) {
 
     // 2. Persist to Supabase — retry once on failure
     const tryWrite = async () => {
-      const { error } = await db.setLoteActivo(id);
+      const { error } = await db.setLoteActivo(id, sorteoId);
       if (error) {
         console.warn('[sorteo] sorteo_estado write failed, retrying:', error.message);
         await new Promise(r => setTimeout(r, 800));
-        const { error: error2 } = await db.setLoteActivo(id);
+        const { error: error2 } = await db.setLoteActivo(id, sorteoId);
         if (error2) console.error('[sorteo] sorteo_estado write failed after retry:', error2.message);
       }
     };
@@ -98,7 +128,7 @@ export function useAppData(sorteoId) {
     setTimeout(() => {
       if (mountedRef.current) fetchSorteoEstado();
     }, 1200);
-  }, [applyLoteActivoId, fetchSorteoEstado]);
+  }, [applyLoteActivoId, fetchSorteoEstado, sorteoId]);
 
   const fetchResultados = useCallback(async () => {
     if (!sorteoId) return { data: [] };
@@ -243,7 +273,10 @@ export function useAppData(sorteoId) {
   useEffect(() => {
     return subscribeSorteoUpdates({
       onRefresh:   fetchResultados,
-      onLoteActivo: (id) => applyLoteActivoId(id),
+      onLoteActivo: (id) => {
+        pendingLoteRef.current = { id, since: Date.now() };
+        applyLoteActivoId(id);
+      },
     });
   }, [fetchResultados, applyLoteActivoId]);
 

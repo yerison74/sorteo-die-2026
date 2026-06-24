@@ -80,13 +80,16 @@ export const db = {
   deleteResultado: (id) =>
     supabase.from('resultados_sorteo').delete().eq('id', id),
 
-  getSorteoEstado: () =>
-    supabase.from('sorteo_estado').select('lote_activo_id').eq('id', 1).maybeSingle(),
+  getSorteoEstado: (sorteoId) =>
+    supabase.from('sorteo_estado').select('lote_actual_id').eq('sorteo_activo_id', sorteoId).maybeSingle(),
 
-  setLoteActivo: (loteId) =>
+  setLoteActivo: (loteId, sorteoId) =>
     supabase
       .from('sorteo_estado')
-      .upsert({ id: 1, lote_activo_id: loteId ?? null, updated_at: new Date().toISOString() })
+      .upsert(
+        { sorteo_activo_id: sorteoId, lote_actual_id: loteId ?? null, actualizado: new Date().toISOString() },
+        { onConflict: 'sorteo_activo_id' }
+      )
       .select()
       .single(),
 };
