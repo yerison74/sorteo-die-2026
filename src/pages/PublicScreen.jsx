@@ -48,6 +48,8 @@ function GanadorPublicCard({ posicion, resultado }) {
 export default function PublicScreen({ lotes, items, resultados, loteActivo, lastSyncAt, syncing, estadoLoaded }) {
   const { sorteoActivo } = useAuth();
   const sorteoNombre = sorteoActivo?.nombre || 'DIE-2026';
+  // Extrae el sufijo corto del sorteo (ej: "DIE-2026-S02" → "S02")
+  const sorteoSufijo = (sorteoNombre.match(/S\d+$/) || [sorteoNombre])[0];
   // Lotes que tienen AL MENOS UN resultado registrado
   const lotesConResultado = lotes
     .filter(l => resultados.some(r => r.lote_id === l.id))
@@ -62,9 +64,16 @@ export default function PublicScreen({ lotes, items, resultados, loteActivo, las
   const currentLote = loteActivo; // resolveLoteEnVivo fallback removed: hook handles it
 
   // Historial: solo lotes con Ganador Principal registrado (posicion === 1)
+  // Orden CRONOLÓGICO real (el más reciente registrado primero), no por numero_lote.
   const historial = lotes
     .filter(l => resultados.some(r => r.lote_id === l.id && r.posicion === 1))
-    .sort((a, b) => b.numero_lote - a.numero_lote)
+    .sort((a, b) => {
+      const ga = resultados.find(r => r.lote_id === a.id && r.posicion === 1);
+      const gb = resultados.find(r => r.lote_id === b.id && r.posicion === 1);
+      const ta = ga?.fecha_registro ? new Date(ga.fecha_registro).getTime() : (ga?.id ?? 0);
+      const tb = gb?.fecha_registro ? new Date(gb.fecha_registro).getTime() : (gb?.id ?? 0);
+      return tb - ta; // más reciente primero
+    })
     .slice(0, 12);
 
   const getLoteRes   = (l) => resultados.filter(r => r.lote_id === l.id).sort((a, b) => a.posicion - b.posicion);
@@ -136,7 +145,7 @@ export default function PublicScreen({ lotes, items, resultados, loteActivo, las
               </div>
             </div>
             <div style={{ textAlign: 'right', opacity: 0.5 }}>
-              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 28, color: 'var(--gold)' }}>S01</div>
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 28, color: 'var(--gold)' }}>{sorteoSufijo}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>DIE · 2026</div>
             </div>
           </div>

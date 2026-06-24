@@ -17,13 +17,15 @@ export const POSICION_ICONS = {
 };
 
 /**
- * Código de tómbola por tipo: DIE-2026-S01-{A|B}-{000}
+ * Código de tómbola por tipo: {SORTEO}-{A|B}-{000}
  * El número es el orden de registro dentro de esa tombola (no el id del lote).
+ * sorteoNombre debe venir del sorteo activo real (ej: "DIE-2026-S02").
  */
-export function generateCode(tipo, numero) {
+export function generateCode(tipo, numero, sorteoNombre) {
   const t = String(tipo || '').toUpperCase();
   const padded = String(parseInt(numero, 10)).padStart(3, '0');
-  return `DIE-2026-S01-${t}-${padded}`;
+  const prefix = sorteoNombre || 'DIE-2026-S01';
+  return `${prefix}-${t}-${padded}`;
 }
 
 export function fmt(n) {

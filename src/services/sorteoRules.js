@@ -1,13 +1,12 @@
 import { generateCode, padLote } from '../utils';
 
-const CODE_PREFIX = 'DIE-2026-S01';
-
-/** Parsea DIE-2026-S01-{A|B}-{000} */
+/** Parsea {SORTEO}-{A|B}-{000} sin importar el prefijo del sorteo (DIE-2026-S01, S02, etc.) */
 export function parseOferenteCode(codigo) {
   if (!codigo) return null;
-  const m = String(codigo).trim().match(/^DIE-2026-S01-([AB])-(\d{3})$/i);
+  const m = String(codigo).trim().match(/^(.+)-([AB])-(\d{3})$/i);
   if (!m) return null;
-  return { tipo: m[1].toUpperCase(), numero: m[2], codigo: generateCode(m[1], m[2]) };
+  const [, prefix, tipoRaw, numero] = m;
+  return { tipo: tipoRaw.toUpperCase(), numero, codigo: generateCode(tipoRaw, numero, prefix) };
 }
 
 /** Identidad estable entre filas A/B del mismo oferente (RNC > RPE > id) */
@@ -67,7 +66,7 @@ export function validateCodeForLoteTipo(codigo, loteTipo) {
   const parsed = parseOferenteCode(codigo);
   const tipo = (loteTipo || '').toUpperCase();
   if (!parsed) {
-    return { ok: false, message: `Código inválido. Use el formato ${CODE_PREFIX}-${tipo}-000` };
+    return { ok: false, message: `Código inválido. Use el formato {SORTEO}-${tipo}-000` };
   }
   if (parsed.tipo !== tipo) {
     return {
@@ -78,8 +77,8 @@ export function validateCodeForLoteTipo(codigo, loteTipo) {
   return { ok: true, parsed };
 }
 
-export function buildCodigoFromTombola(tipo, numeroInput) {
+export function buildCodigoFromTombola(tipo, numeroInput, sorteoNombre) {
   const n = parseInt(String(numeroInput).trim(), 10);
   if (!Number.isFinite(n) || n < 1 || n > 999) return null;
-  return generateCode((tipo || 'A').toUpperCase(), n);
+  return generateCode((tipo || 'A').toUpperCase(), n, sorteoNombre);
 }

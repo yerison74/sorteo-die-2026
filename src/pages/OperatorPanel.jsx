@@ -41,7 +41,7 @@ export default function OperatorPanel({
 
   const codigoBuscado =
     selectedLote && numero.trim()
-      ? generateCode(selectedLote.tipo, numero.trim())
+      ? generateCode(selectedLote.tipo, numero.trim(), sorteoActivo?.nombre)
       : '';
 
   // ── Search ──────────────────────────────────────────────────────

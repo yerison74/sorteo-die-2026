@@ -92,9 +92,16 @@ export default function PublicMobile({ lotes, items, resultados, loteActivo, las
   const currentItems  = currentLote ? items.filter(it => it.lote_id === currentLote.id) : [];
 
   // Ganadores tab: solo lotes con Ganador Principal confirmado (posicion === 1)
+  // Orden CRONOLÓGICO real (el más reciente registrado primero), no por numero_lote.
   const lotesAdjudicados = lotes
     .filter(l => resultados.some(r => r.lote_id === l.id && r.posicion === 1))
-    .sort((a, b) => b.numero_lote - a.numero_lote);
+    .sort((a, b) => {
+      const ga = resultados.find(r => r.lote_id === a.id && r.posicion === 1);
+      const gb = resultados.find(r => r.lote_id === b.id && r.posicion === 1);
+      const ta = ga?.fecha_registro ? new Date(ga.fecha_registro).getTime() : (ga?.id ?? 0);
+      const tb = gb?.fecha_registro ? new Date(gb.fecha_registro).getTime() : (gb?.id ?? 0);
+      return tb - ta; // más reciente primero
+    });
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: 40 }}>
